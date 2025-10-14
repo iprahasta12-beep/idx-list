@@ -1,1 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>IDX Trading Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              aerialSky: '#5BC3EB',
+              aerialPurple: '#6F58E9',
+              aerialLilac: '#C7C1FF',
+              aerialGreen: '#7ED957',
+              aerialSlate: '#EEF2FF',
+            },
+          },
+        },
+      };
+    </script>
+  </head>
+  <body class="min-h-screen bg-gradient-to-b from-aerialPurple via-indigo-500 to-sky-500 text-slate-900">
+    <div class="mx-auto max-w-6xl px-4 py-16 text-white">
+      <header class="flex flex-col gap-10 lg:flex-row lg:items-center">
+        <div class="flex-1 space-y-6">
+          <span class="inline-flex w-fit rounded-full bg-white/10 px-4 py-1 text-sm font-semibold uppercase tracking-wider">Climate action</span>
+          <h1 class="text-4xl font-bold leading-tight sm:text-5xl">Climate action, in your hands</h1>
+          <p class="max-w-xl text-lg text-slate-100">
+            Accurately offset your carbon footprint with IDX. Track your impact, learn from insights, and take action toward a cleaner future in just a tap.
+          </p>
+          <div class="flex flex-wrap gap-4 text-sm font-semibold">
+            <a href="#" class="rounded-full bg-white px-5 py-2 text-aerialPurple shadow-lg shadow-black/10 transition hover:-translate-y-0.5">Download App</a>
+            <a href="#" class="rounded-full border border-white/60 px-5 py-2 text-white transition hover:bg-white/15">Explore community</a>
+          </div>
+        </div>
+        <div class="flex-1">
+          <div class="relative mx-auto max-w-md rounded-3xl bg-white/10 p-6 shadow-2xl backdrop-blur">
+            <div class="absolute -top-6 left-8 inline-flex items-center gap-3 rounded-full bg-white px-4 py-2 text-sm text-aerialPurple shadow-lg">
+              <span class="flex h-10 w-10 items-center justify-center rounded-full bg-aerialGreen/20 text-lg font-bold text-aerialGreen">27</span>
+              <div>
+                <p class="font-semibold text-slate-800">April 2024</p>
+                <p class="text-xs text-slate-600">Daily emissions offset</p>
+              </div>
+            </div>
+            <img src="https://images.unsplash.com/photo-1514474959185-1472d4c4b1fb?auto=format&fit=crop&w=900&q=80" alt="Eco island illustration" class="mt-10 h-64 w-full rounded-2xl object-cover shadow-lg" />
+          </div>
+        </div>
+      </header>
 
+      <section class="mt-24 grid gap-12 lg:grid-cols-[280px,1fr]">
+        <aside class="rounded-3xl bg-white/10 p-6 backdrop-blur">
+          <div class="flex items-center gap-4">
+            <div class="flex h-16 w-16 items-center justify-center rounded-2xl bg-white/20 text-2xl font-semibold text-white">27</div>
+            <div>
+              <p class="text-sm uppercase tracking-wide text-white/70">Date</p>
+              <p class="text-lg font-semibold text-white">May 14, 2024</p>
+            </div>
+          </div>
+          <h2 class="mt-8 text-2xl font-semibold text-white">Trading Signals Update</h2>
+          <p class="mt-3 text-sm text-white/80">
+            Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer non ornare lacus. Mauris at arcu id metus dapibus lacinia.
+          </p>
+        </aside>
+
+        <div class="rounded-3xl bg-white p-8 shadow-2xl">
+          <div class="flex flex-wrap items-center gap-4">
+            <button data-tab="trading" class="tab-button rounded-full bg-aerialPurple px-6 py-2 text-sm font-semibold text-white shadow-lg shadow-aerialPurple/30 transition focus:outline-none focus:ring-2 focus:ring-aerialPurple">Trading</button>
+            <button data-tab="indicators" class="tab-button rounded-full bg-slate-100 px-6 py-2 text-sm font-semibold text-aerialPurple transition hover:bg-aerialLilac/40 focus:outline-none focus:ring-2 focus:ring-aerialPurple">Indicators</button>
+          </div>
+
+          <div class="mt-8 overflow-x-auto">
+            <table data-panel="trading" class="tab-panel w-full min-w-[480px] table-auto border-separate border-spacing-y-2">
+              <thead>
+                <tr class="text-left text-xs uppercase tracking-wide text-slate-500">
+                  <th class="rounded-l-xl bg-slate-50 px-4 py-3">Ticker</th>
+                  <th class="bg-slate-50 px-4 py-3">Entry Price</th>
+                  <th class="bg-slate-50 px-4 py-3">Stop Loss</th>
+                  <th class="rounded-r-xl bg-slate-50 px-4 py-3">Take Profit</th>
+                </tr>
+              </thead>
+              <tbody class="text-sm text-slate-700">
+                <tr class="bg-slate-100/70">
+                  <td class="rounded-l-xl px-4 py-3 font-semibold text-slate-900">AAPL</td>
+                  <td class="px-4 py-3">$172.45</td>
+                  <td class="px-4 py-3">$165.00</td>
+                  <td class="rounded-r-xl px-4 py-3 text-emerald-600">$185.00</td>
+                </tr>
+                <tr class="bg-slate-100/70">
+                  <td class="rounded-l-xl px-4 py-3 font-semibold text-slate-900">TSLA</td>
+                  <td class="px-4 py-3">$231.20</td>
+                  <td class="px-4 py-3">$218.00</td>
+                  <td class="rounded-r-xl px-4 py-3 text-emerald-600">$260.00</td>
+                </tr>
+                <tr class="bg-slate-100/70">
+                  <td class="rounded-l-xl px-4 py-3 font-semibold text-slate-900">NVDA</td>
+                  <td class="px-4 py-3">$642.10</td>
+                  <td class="px-4 py-3">$600.00</td>
+                  <td class="rounded-r-xl px-4 py-3 text-emerald-600">$720.00</td>
+                </tr>
+                <tr class="bg-slate-100/70">
+                  <td class="rounded-l-xl px-4 py-3 font-semibold text-slate-900">AMZN</td>
+                  <td class="px-4 py-3">$152.35</td>
+                  <td class="px-4 py-3">$144.00</td>
+                  <td class="rounded-r-xl px-4 py-3 text-emerald-600">$165.00</td>
+                </tr>
+              </tbody>
+            </table>
+
+            <table data-panel="indicators" class="tab-panel hidden w-full min-w-[960px] table-auto border-separate border-spacing-y-2">
+              <thead>
+                <tr class="text-left text-xs uppercase tracking-wide text-slate-500">
+                  <th class="rounded-l-xl bg-slate-50 px-4 py-3">Ticker</th>
+                  <th class="bg-slate-50 px-4 py-3">Close</th>
+                  <th class="bg-slate-50 px-4 py-3">Volume</th>
+                  <th class="bg-slate-50 px-4 py-3">MA20</th>
+                  <th class="bg-slate-50 px-4 py-3">MA50</th>
+                  <th class="bg-slate-50 px-4 py-3">RSI14</th>
+                  <th class="bg-slate-50 px-4 py-3">Max30</th>
+                  <th class="bg-slate-50 px-4 py-3">Max30 Date</th>
+                  <th class="bg-slate-50 px-4 py-3">New30HighWithin5</th>
+                  <th class="bg-slate-50 px-4 py-3">Pullback2DnStay&gt;MA20</th>
+                  <th class="bg-slate-50 px-4 py-3">Bullish Reversal</th>
+                  <th class="bg-slate-50 px-4 py-3">Vol Surge 130</th>
+                  <th class="rounded-r-xl bg-slate-50 px-4 py-3">Indicator</th>
+                </tr>
+              </thead>
+              <tbody class="text-sm text-slate-700">
+                <tr class="bg-slate-100/70">
+                  <td class="rounded-l-xl px-4 py-3 font-semibold text-slate-900">MSFT</td>
+                  <td class="px-4 py-3">$412.22</td>
+                  <td class="px-4 py-3">21.5M</td>
+                  <td class="px-4 py-3">$405.80</td>
+                  <td class="px-4 py-3">$390.10</td>
+                  <td class="px-4 py-3 text-emerald-600">62</td>
+                  <td class="px-4 py-3">$418.00</td>
+                  <td class="px-4 py-3">Apr 09</td>
+                  <td class="px-4 py-3">Yes</td>
+                  <td class="px-4 py-3">No</td>
+                  <td class="px-4 py-3">Emerging</td>
+                  <td class="px-4 py-3 text-emerald-600">Yes</td>
+                  <td class="rounded-r-xl px-4 py-3 font-medium text-aerialPurple">Momentum</td>
+                </tr>
+                <tr class="bg-slate-100/70">
+                  <td class="rounded-l-xl px-4 py-3 font-semibold text-slate-900">NFLX</td>
+                  <td class="px-4 py-3">$588.73</td>
+                  <td class="px-4 py-3">8.9M</td>
+                  <td class="px-4 py-3">$575.40</td>
+                  <td class="px-4 py-3">$542.60</td>
+                  <td class="px-4 py-3 text-amber-500">54</td>
+                  <td class="px-4 py-3">$599.10</td>
+                  <td class="px-4 py-3">Apr 22</td>
+                  <td class="px-4 py-3">No</td>
+                  <td class="px-4 py-3">Yes</td>
+                  <td class="px-4 py-3">Confirmed</td>
+                  <td class="px-4 py-3 text-emerald-600">Yes</td>
+                  <td class="rounded-r-xl px-4 py-3 font-medium text-aerialPurple">Breakout</td>
+                </tr>
+                <tr class="bg-slate-100/70">
+                  <td class="rounded-l-xl px-4 py-3 font-semibold text-slate-900">GOOGL</td>
+                  <td class="px-4 py-3">$142.18</td>
+                  <td class="px-4 py-3">19.2M</td>
+                  <td class="px-4 py-3">$138.40</td>
+                  <td class="px-4 py-3">$132.85</td>
+                  <td class="px-4 py-3 text-emerald-600">58</td>
+                  <td class="px-4 py-3">$145.50</td>
+                  <td class="px-4 py-3">Mar 29</td>
+                  <td class="px-4 py-3">No</td>
+                  <td class="px-4 py-3">No</td>
+                  <td class="px-4 py-3">Emerging</td>
+                  <td class="px-4 py-3 text-amber-500">Watch</td>
+                  <td class="rounded-r-xl px-4 py-3 font-medium text-aerialPurple">Trend</td>
+                </tr>
+                <tr class="bg-slate-100/70">
+                  <td class="rounded-l-xl px-4 py-3 font-semibold text-slate-900">AMD</td>
+                  <td class="px-4 py-3">$184.66</td>
+                  <td class="px-4 py-3">17.3M</td>
+                  <td class="px-4 py-3">$178.20</td>
+                  <td class="px-4 py-3">$165.40</td>
+                  <td class="px-4 py-3 text-emerald-600">65</td>
+                  <td class="px-4 py-3">$192.80</td>
+                  <td class="px-4 py-3">Apr 18</td>
+                  <td class="px-4 py-3">Yes</td>
+                  <td class="px-4 py-3">Yes</td>
+                  <td class="px-4 py-3">Confirmed</td>
+                  <td class="px-4 py-3 text-emerald-600">Yes</td>
+                  <td class="rounded-r-xl px-4 py-3 font-medium text-aerialPurple">Momentum</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <script>
+      document.querySelectorAll('.tab-button').forEach((button) => {
+        button.addEventListener('click', () => {
+          const selected = button.dataset.tab;
+
+          document.querySelectorAll('.tab-button').forEach((btn) => {
+            const isActive = btn.dataset.tab === selected;
+            btn.classList.toggle('bg-aerialPurple', isActive);
+            btn.classList.toggle('text-white', isActive);
+            btn.classList.toggle('shadow-lg', isActive);
+            btn.classList.toggle('shadow-aerialPurple/30', isActive);
+            btn.classList.toggle('bg-slate-100', !isActive);
+            btn.classList.toggle('text-aerialPurple', !isActive);
+          });
+
+          document.querySelectorAll('.tab-panel').forEach((panel) => {
+            panel.classList.toggle('hidden', panel.dataset.panel !== selected);
+          });
+        });
+      });
+    </script>
+  </body>
+</html>
