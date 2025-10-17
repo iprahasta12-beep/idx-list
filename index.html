@@ -45,6 +45,11 @@
             <button data-tab="indicators" class="tab-button rounded-full bg-slate-100 px-6 py-2 text-sm font-semibold text-aerialPurple transition hover:bg-aerialLilac/40 focus:outline-none focus:ring-2 focus:ring-aerialPurple">Indicators</button>
           </div>
 
+          <div class="mt-3 flex flex-col gap-1 text-sm text-slate-200 sm:flex-row sm:items-center sm:justify-between">
+            <span class="font-medium text-white">Last updated: <span id="last-updated" class="font-normal text-slate-200">--</span></span>
+            <span class="text-slate-200/80">IDX ticker automation runs Monday to Friday, 08:00 - 17:00.</span>
+          </div>
+
           <div class="mt-4 overflow-x-auto">
             <table data-panel="trading" class="tab-panel w-full min-w-[480px] table-auto border-separate border-spacing-y-2">
               <thead>
@@ -175,6 +180,15 @@
     </div>
 
     <script>
+      const lastUpdatedElement = document.getElementById('last-updated');
+      if (lastUpdatedElement) {
+        const formatter = new Intl.DateTimeFormat(undefined, {
+          dateStyle: 'medium',
+          timeStyle: 'short',
+        });
+        lastUpdatedElement.textContent = formatter.format(new Date());
+      }
+
       document.querySelectorAll('.tab-button').forEach((button) => {
         button.addEventListener('click', () => {
           const selected = button.dataset.tab;
