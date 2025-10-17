@@ -1,1 +1,32 @@
-proyek mercusuar
+IDX Quote Automation
+====================
+
+This project now includes a Python automation script that downloads IDX ticker
+quotes from the public Yahoo Finance API and saves the snapshots into a SQLite
+database every hour.
+
+How it works
+------------
+* Tickers covered by default: CMRY, MAIN, BBCA, BMRI, ARCI (queried via the
+  `.JK` Yahoo suffix).
+* Quote data is stored in the `data/idx_quotes.db` SQLite database. Each row
+  keeps the fetched price information along with a `latest_update_label`
+  column similar to `"Latest update 14:00"`.
+* Fetches run every hour by default, but you can override the interval with a
+  command-line flag.
+
+Running the automation
+----------------------
+
+```bash
+python automation/fetch_idx_quotes.py
+```
+
+Useful flags:
+
+* `--once`: Fetch once and exit. Useful for testing.
+* `--interval <seconds>`: Change the fetch frequency.
+* `--database <path>`: Store the SQLite database at a custom location.
+* `--tickers <symbols>`: Override the tickers to fetch.
+
+The script creates the database and table automatically the first time it runs.
