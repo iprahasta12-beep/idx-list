@@ -41,6 +41,10 @@ class Quote:
     price: float | None
     currency: str | None
     regular_market_time: datetime | None
+    open_price: float | None
+    day_high: float | None
+    day_low: float | None
+    previous_close: float | None
 
     @classmethod
     def from_yahoo_payload(cls, payload: dict) -> "Quote":
@@ -62,6 +66,10 @@ class Quote:
             price=price,
             currency=currency,
             regular_market_time=market_time,
+            open_price=payload.get("regularMarketOpen"),
+            day_high=payload.get("regularMarketDayHigh"),
+            day_low=payload.get("regularMarketDayLow"),
+            previous_close=payload.get("regularMarketPreviousClose"),
         )
 
 
@@ -111,11 +119,32 @@ def ensure_schema(connection: sqlite3.Connection) -> None:
             price REAL,
             currency TEXT,
             regular_market_time TEXT,
+            open_price REAL,
+            day_high REAL,
+            day_low REAL,
+            previous_close REAL,
             fetch_time_utc TEXT NOT NULL,
             latest_update_label TEXT NOT NULL
         )
         """
     )
+    # Add any missing OHLC columns for databases created before the
+    # additional fields were introduced. SQLite allows ALTER TABLE ADD
+    # COLUMN to run repeatedly without affecting existing data when the
+    # column already exists, so we guard against duplicates by inspecting
+    # the schema first.
+    existing_columns = {
+        row[1] for row in connection.execute("PRAGMA table_info('idx_quotes')")
+    }
+    required_columns = {
+        "open_price": "ALTER TABLE idx_quotes ADD COLUMN open_price REAL",
+        "day_high": "ALTER TABLE idx_quotes ADD COLUMN day_high REAL",
+        "day_low": "ALTER TABLE idx_quotes ADD COLUMN day_low REAL",
+        "previous_close": "ALTER TABLE idx_quotes ADD COLUMN previous_close REAL",
+    }
+    for column_name, alter_statement in required_columns.items():
+        if column_name not in existing_columns:
+            connection.execute(alter_statement)
     connection.commit()
 
 
@@ -136,6 +165,10 @@ def store_quotes(connection: sqlite3.Connection, quotes: Iterable[Quote]) -> Non
             quote.price,
             quote.currency,
             quote.regular_market_time.isoformat() if quote.regular_market_time else None,
+            quote.open_price,
+            quote.day_high,
+            quote.day_low,
+            quote.previous_close,
             now_utc.isoformat(),
             latest_update_label,
         )
@@ -153,9 +186,13 @@ def store_quotes(connection: sqlite3.Connection, quotes: Iterable[Quote]) -> Non
             price,
             currency,
             regular_market_time,
+            open_price,
+            day_high,
+            day_low,
+            previous_close,
             fetch_time_utc,
             latest_update_label
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         rows,
     )

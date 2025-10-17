@@ -10,8 +10,9 @@ How it works
 * Tickers covered by default: CMRY, MAIN, BBCA, BMRI, ARCI (queried via the
   `.JK` Yahoo suffix).
 * Quote data is stored in the `data/idx_quotes.db` SQLite database. Each row
-  keeps the fetched price information along with a `latest_update_label`
-  column similar to `"Latest update 14:00"`.
+  keeps the fetched price information, OHLC fields (open, day high, day low,
+  previous close), along with a `latest_update_label` column similar to
+  `"Latest update 14:00"`.
 * Fetches run every hour by default, but you can override the interval with a
   command-line flag.
 
