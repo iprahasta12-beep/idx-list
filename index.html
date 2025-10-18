@@ -58,51 +58,45 @@
             <span class="font-medium text-slate-800">Last updated: <span id="last-updated" class="font-normal text-slate-400">--</span></span>
           </div>
           </div>
-
-          
+          <div class="mt-6 flex flex-wrap gap-3 rounded-2xl bg-slate-50/80 p-4 text-sm text-slate-600">
+            <div class="flex flex-col gap-1">
+              <label for="ticker-filter" class="font-semibold text-slate-700">Ticker</label>
+              <select id="ticker-filter" class="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-800 focus:border-aerialPurple focus:outline-none focus:ring-2 focus:ring-aerialPurple/30">
+                <option value="all">All tickers</option>
+              </select>
+            </div>
+            <div class="flex flex-col gap-1">
+              <label for="date-filter" class="font-semibold text-slate-700">Trading date</label>
+              <input type="date" id="date-filter" class="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-800 focus:border-aerialPurple focus:outline-none focus:ring-2 focus:ring-aerialPurple/30" />
+            </div>
+            <div class="ml-auto flex items-end">
+              <button id="clear-filters" class="rounded-full bg-white px-4 py-2 font-semibold text-aerialPurple shadow-sm shadow-aerialPurple/20 transition hover:bg-aerialLilac/60 focus:outline-none focus:ring-2 focus:ring-aerialPurple/40">
+                Reset filters
+              </button>
+            </div>
+          </div>
 
           <div class="mt-4 overflow-x-auto">
-            <table data-panel="trading" class="tab-panel w-full min-w-[480px] table-auto border-separate border-spacing-y-2">
+            <div id="trading-loading" class="hidden rounded-xl bg-slate-100 px-4 py-3 text-sm text-slate-500">Loading historical data…</div>
+            <div id="trading-error" class="hidden rounded-xl bg-rose-100 px-4 py-3 text-sm text-rose-600"></div>
+            <table data-panel="trading" class="tab-panel w-full min-w-[640px] table-auto border-separate border-spacing-y-2">
               <thead>
                 <tr class="text-left text-xs uppercase tracking-wide text-slate-500">
-                  <th class="rounded-l-xl bg-slate-50 px-4 py-3">Ticker</th>
+                  <th class="rounded-l-xl bg-slate-50 px-4 py-3">Date</th>
+                  <th class="bg-slate-50 px-4 py-3">Ticker</th>
                   <th class="bg-slate-50 px-4 py-3">Open</th>
                   <th class="bg-slate-50 px-4 py-3">High</th>
                   <th class="bg-slate-50 px-4 py-3">Low</th>
-                  <th class="rounded-r-xl bg-slate-50 px-4 py-3">Close</th>
+                  <th class="bg-slate-50 px-4 py-3">Close</th>
+                  <th class="rounded-r-xl bg-slate-50 px-4 py-3">Volume</th>
                 </tr>
               </thead>
-              <tbody class="text-sm text-slate-700">
-                <tr class="bg-slate-100/70">
-                  <td class="rounded-l-xl px-4 py-3 font-semibold text-slate-900">BBCA.JK</td>
-                  <td class="px-4 py-3">Rp9,600</td>
-                  <td class="px-4 py-3">Rp9,725</td>
-                  <td class="px-4 py-3">Rp9,525</td>
-                  <td class="rounded-r-xl px-4 py-3 text-emerald-600">Rp9,700</td>
-                </tr>
-                <tr class="bg-slate-100/70">
-                  <td class="rounded-l-xl px-4 py-3 font-semibold text-slate-900">BMRI.JK</td>
-                  <td class="px-4 py-3">Rp6,300</td>
-                  <td class="px-4 py-3">Rp6,375</td>
-                  <td class="px-4 py-3">Rp6,250</td>
-                  <td class="rounded-r-xl px-4 py-3 text-emerald-600">Rp6,325</td>
-                </tr>
-                <tr class="bg-slate-100/70">
-                  <td class="rounded-l-xl px-4 py-3 font-semibold text-slate-900">CMRY.JK</td>
-                  <td class="px-4 py-3">Rp5,450</td>
-                  <td class="px-4 py-3">Rp5,525</td>
-                  <td class="px-4 py-3">Rp5,400</td>
-                  <td class="rounded-r-xl px-4 py-3 text-emerald-600">Rp5,500</td>
-                </tr>
-                <tr class="bg-slate-100/70">
-                  <td class="rounded-l-xl px-4 py-3 font-semibold text-slate-900">ARCI.JK</td>
-                  <td class="px-4 py-3">Rp480</td>
-                  <td class="px-4 py-3">Rp496</td>
-                  <td class="px-4 py-3">Rp472</td>
-                  <td class="rounded-r-xl px-4 py-3 text-emerald-600">Rp490</td>
-                </tr>
-              </tbody>
+              <tbody id="trading-table-body" class="text-sm text-slate-700"></tbody>
             </table>
+            <div id="trading-empty-state" class="hidden rounded-xl bg-slate-100 px-4 py-6 text-center text-sm text-slate-500">
+              No trades found for the selected filters.
+            </div>
+          </div>
 
             <table data-panel="indicators" class="tab-panel hidden w-full min-w-[960px] table-auto border-separate border-spacing-y-2">
               <thead>
@@ -192,13 +186,184 @@
 
     <script>
       const lastUpdatedElement = document.getElementById('last-updated');
-      if (lastUpdatedElement) {
-        const formatter = new Intl.DateTimeFormat(undefined, {
-          dateStyle: 'medium',
-          timeStyle: 'short',
-        });
-        lastUpdatedElement.textContent = formatter.format(new Date());
+      const tradingTableBody = document.getElementById('trading-table-body');
+      const tradingEmptyState = document.getElementById('trading-empty-state');
+      const tradingLoading = document.getElementById('trading-loading');
+      const tradingError = document.getElementById('trading-error');
+      const tickerFilter = document.getElementById('ticker-filter');
+      const dateFilter = document.getElementById('date-filter');
+      const clearFiltersButton = document.getElementById('clear-filters');
+      const tradingDataUrl = 'data/trading_history.json';
+
+      let tradingData = [];
+
+      const dateFormatter = new Intl.DateTimeFormat(undefined, {
+        dateStyle: 'medium',
+      });
+      const currencyFormatter = new Intl.NumberFormat('id-ID', {
+        style: 'currency',
+        currency: 'IDR',
+        maximumFractionDigits: 0,
+      });
+      const numberFormatter = new Intl.NumberFormat('id-ID');
+
+      function updateLastUpdated() {
+        if (!lastUpdatedElement || tradingData.length === 0) {
+          return;
+        }
+        const latestDate = tradingData
+          .map((record) => record.date)
+          .sort()
+          .at(-1);
+        if (!latestDate) {
+          return;
+        }
+        lastUpdatedElement.textContent = dateFormatter.format(new Date(`${latestDate}T00:00:00Z`));
       }
+
+      function populateFilters() {
+        if (!tickerFilter || tradingData.length === 0) {
+          return;
+        }
+        const tickers = Array.from(new Set(tradingData.map((record) => record.symbol))).sort();
+        tickerFilter.innerHTML = '<option value="all">All tickers</option>';
+        tickers.forEach((symbol) => {
+          const option = document.createElement('option');
+          option.value = symbol;
+          option.textContent = symbol;
+          tickerFilter.append(option);
+        });
+
+        if (dateFilter) {
+          const sortedDates = Array.from(new Set(tradingData.map((record) => record.date))).sort();
+          if (sortedDates.length > 0) {
+            dateFilter.min = sortedDates[0];
+            dateFilter.max = sortedDates.at(-1);
+          }
+        }
+      }
+
+      function renderTable(rows) {
+        if (!tradingTableBody) {
+          return;
+        }
+        tradingTableBody.innerHTML = '';
+
+        if (!rows || rows.length === 0) {
+          if (tradingEmptyState) {
+            tradingEmptyState.classList.remove('hidden');
+          }
+          return;
+        }
+
+        if (tradingEmptyState) {
+          tradingEmptyState.classList.add('hidden');
+        }
+
+        rows.forEach((row) => {
+          const tr = document.createElement('tr');
+          tr.className = 'bg-slate-100/70';
+
+          const cells = [
+            dateFormatter.format(new Date(`${row.date}T00:00:00Z`)),
+            row.symbol,
+            row.open != null ? currencyFormatter.format(row.open) : '—',
+            row.high != null ? currencyFormatter.format(row.high) : '—',
+            row.low != null ? currencyFormatter.format(row.low) : '—',
+            row.close != null ? currencyFormatter.format(row.close) : '—',
+            row.volume != null ? numberFormatter.format(row.volume) : '—',
+          ];
+
+          cells.forEach((value, index) => {
+            const td = document.createElement('td');
+            td.className = `px-4 py-3 ${index === 0 ? 'rounded-l-xl font-semibold text-slate-900' : ''} ${
+              index === cells.length - 1 ? 'rounded-r-xl' : ''
+            }`;
+            td.textContent = value;
+            tr.append(td);
+          });
+
+          tradingTableBody.append(tr);
+        });
+      }
+
+      function applyFilters() {
+        if (tradingData.length === 0) {
+          renderTable([]);
+          return;
+        }
+
+        const selectedTicker = tickerFilter && tickerFilter.value !== 'all' ? tickerFilter.value : null;
+        const selectedDate = dateFilter && dateFilter.value ? dateFilter.value : null;
+
+        let filtered = tradingData.slice();
+        if (selectedTicker) {
+          filtered = filtered.filter((row) => row.symbol === selectedTicker);
+        }
+        if (selectedDate) {
+          filtered = filtered.filter((row) => row.date === selectedDate);
+        }
+
+        filtered.sort((a, b) => {
+          if (a.date === b.date) {
+            return a.symbol.localeCompare(b.symbol);
+          }
+          return a.date < b.date ? 1 : -1;
+        });
+
+        renderTable(filtered);
+      }
+
+      async function loadTradingData() {
+        if (!tradingTableBody) {
+          return;
+        }
+        if (tradingLoading) {
+          tradingLoading.classList.remove('hidden');
+        }
+        if (tradingError) {
+          tradingError.classList.add('hidden');
+          tradingError.textContent = '';
+        }
+
+        try {
+          const response = await fetch(tradingDataUrl, { cache: 'no-cache' });
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+          }
+          const payload = await response.json();
+          tradingData = Array.isArray(payload) ? payload : [];
+          populateFilters();
+          applyFilters();
+          updateLastUpdated();
+        } catch (error) {
+          if (tradingError) {
+            tradingError.textContent = `Failed to load trading data: ${error instanceof Error ? error.message : 'Unknown error'}`;
+            tradingError.classList.remove('hidden');
+          }
+          renderTable([]);
+          if (tradingEmptyState) {
+            tradingEmptyState.classList.add('hidden');
+          }
+        } finally {
+          if (tradingLoading) {
+            tradingLoading.classList.add('hidden');
+          }
+        }
+      }
+
+      tickerFilter?.addEventListener('change', applyFilters);
+      dateFilter?.addEventListener('change', applyFilters);
+      clearFiltersButton?.addEventListener('click', (event) => {
+        event.preventDefault();
+        if (tickerFilter) {
+          tickerFilter.value = 'all';
+        }
+        if (dateFilter) {
+          dateFilter.value = '';
+        }
+        applyFilters();
+      });
 
       document.querySelectorAll('.tab-button').forEach((button) => {
         button.addEventListener('click', () => {
@@ -219,6 +384,8 @@
           });
         });
       });
+
+      loadTradingData();
     </script>
   </body>
 </html>
