@@ -2,8 +2,8 @@
 """Automate fetching IDX ticker data from Yahoo Finance.
 
 This module fetches quote data for a predefined set of IDX tickers from the
-public Yahoo Finance quote API and stores each snapshot inside a SQLite
-database. The task runs every hour by default, but you can override the
+public Yahoo Finance quote API and stores each snapshot inside a Google Sheets
+worksheet. The task runs every hour by default, but you can override the
 interval or run it once for testing with command-line flags.
 """
 
@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import sqlite3
 import sys
 import time
 from dataclasses import dataclass
@@ -20,6 +19,15 @@ from pathlib import Path
 from typing import Iterable, List, Sequence
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
+
+try:
+    import gspread
+    from gspread.exceptions import WorksheetNotFound
+except ImportError as exc:  # pragma: no cover - dependency injection
+    raise SystemExit(
+        "The 'gspread' package is required to run this script. Install it with"
+        " 'pip install gspread google-auth'."
+    ) from exc
 
 try:
     from zoneinfo import ZoneInfo
@@ -32,6 +40,20 @@ IDX_SUFFIX = ".JK"
 YAHOO_QUOTE_URL = "https://query1.finance.yahoo.com/v7/finance/quote"
 DEFAULT_TICKERS = ["CMRY", "MAIN", "BBCA", "BMRI", "ARCI"]
 JAKARTA_TZ = ZoneInfo("Asia/Jakarta") if ZoneInfo else None
+
+HEADER_ROW = [
+    "symbol",
+    "short_name",
+    "price",
+    "currency",
+    "regular_market_time",
+    "open_price",
+    "day_high",
+    "day_low",
+    "previous_close",
+    "fetch_time_utc",
+    "latest_update_label",
+]
 
 
 @dataclass
@@ -107,49 +129,16 @@ def fetch_quotes(tickers: Sequence[str]) -> List[Quote]:
     return quotes
 
 
-def ensure_schema(connection: sqlite3.Connection) -> None:
-    """Ensure the SQLite schema exists."""
+def ensure_header_row(worksheet: gspread.Worksheet) -> None:
+    """Ensure the worksheet has the expected header row."""
 
-    connection.execute(
-        """
-        CREATE TABLE IF NOT EXISTS idx_quotes (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            symbol TEXT NOT NULL,
-            short_name TEXT,
-            price REAL,
-            currency TEXT,
-            regular_market_time TEXT,
-            open_price REAL,
-            day_high REAL,
-            day_low REAL,
-            previous_close REAL,
-            fetch_time_utc TEXT NOT NULL,
-            latest_update_label TEXT NOT NULL
-        )
-        """
-    )
-    # Add any missing OHLC columns for databases created before the
-    # additional fields were introduced. SQLite allows ALTER TABLE ADD
-    # COLUMN to run repeatedly without affecting existing data when the
-    # column already exists, so we guard against duplicates by inspecting
-    # the schema first.
-    existing_columns = {
-        row[1] for row in connection.execute("PRAGMA table_info('idx_quotes')")
-    }
-    required_columns = {
-        "open_price": "ALTER TABLE idx_quotes ADD COLUMN open_price REAL",
-        "day_high": "ALTER TABLE idx_quotes ADD COLUMN day_high REAL",
-        "day_low": "ALTER TABLE idx_quotes ADD COLUMN day_low REAL",
-        "previous_close": "ALTER TABLE idx_quotes ADD COLUMN previous_close REAL",
-    }
-    for column_name, alter_statement in required_columns.items():
-        if column_name not in existing_columns:
-            connection.execute(alter_statement)
-    connection.commit()
+    existing_header = worksheet.row_values(1)
+    if existing_header != HEADER_ROW:
+        worksheet.update(f"A1:K1", [HEADER_ROW])
 
 
-def store_quotes(connection: sqlite3.Connection, quotes: Iterable[Quote]) -> None:
-    """Store quotes in the SQLite database."""
+def store_quotes(worksheet: gspread.Worksheet, quotes: Iterable[Quote]) -> None:
+    """Store quotes in the Google Sheets worksheet."""
 
     now_utc = datetime.now(timezone.utc)
     if JAKARTA_TZ:
@@ -178,33 +167,28 @@ def store_quotes(connection: sqlite3.Connection, quotes: Iterable[Quote]) -> Non
     if not rows:
         raise RuntimeError("No quote data returned from Yahoo Finance.")
 
-    connection.executemany(
-        """
-        INSERT INTO idx_quotes (
-            symbol,
-            short_name,
-            price,
-            currency,
-            regular_market_time,
-            open_price,
-            day_high,
-            day_low,
-            previous_close,
-            fetch_time_utc,
-            latest_update_label
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        rows,
-    )
-    connection.commit()
+    ensure_header_row(worksheet)
+    worksheet.append_rows(rows, value_input_option="USER_ENTERED")
 
 
-def open_database(path: Path) -> sqlite3.Connection:
-    """Open the SQLite database, creating directories as needed."""
+def open_worksheet(
+    spreadsheet_id: str,
+    worksheet_title: str,
+    service_account_path: Path | None,
+) -> gspread.Worksheet:
+    """Open the target Google Sheets worksheet, creating it if needed."""
 
-    path.parent.mkdir(parents=True, exist_ok=True)
-    connection = sqlite3.connect(path)
-    return connection
+    if service_account_path is not None:
+        client = gspread.service_account(filename=str(service_account_path))
+    else:
+        client = gspread.service_account()
+
+    spreadsheet = client.open_by_key(spreadsheet_id)
+    try:
+        worksheet = spreadsheet.worksheet(worksheet_title)
+    except WorksheetNotFound:
+        worksheet = spreadsheet.add_worksheet(title=worksheet_title, rows="1000", cols="20")
+    return worksheet
 
 
 def parse_args(argv: Sequence[str]) -> argparse.Namespace:
@@ -214,12 +198,6 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
         type=int,
         default=DEFAULT_INTERVAL_SECONDS,
         help="Interval between fetches in seconds (default: 3600).",
-    )
-    parser.add_argument(
-        "--database",
-        type=Path,
-        default=Path(__file__).resolve().parent.parent / "data" / "idx_quotes.db",
-        help="Path to the SQLite database file.",
     )
     parser.add_argument(
         "--tickers",
@@ -232,35 +210,54 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
         action="store_true",
         help="Fetch once and exit instead of running continuously.",
     )
+    parser.add_argument(
+        "--spreadsheet-id",
+        required=True,
+        help="ID of the Google Spreadsheet to update.",
+    )
+    parser.add_argument(
+        "--worksheet",
+        default="Quotes",
+        help="Worksheet title to update or create (default: %(default)s).",
+    )
+    parser.add_argument(
+        "--service-account",
+        type=Path,
+        default=None,
+        help=(
+            "Path to a Google service account JSON key. If omitted,"
+            " gspread's default discovery is used."
+        ),
+    )
     return parser.parse_args(argv)
 
 
-def run_fetch_cycle(connection: sqlite3.Connection, tickers: Sequence[str]) -> None:
+def run_fetch_cycle(worksheet: gspread.Worksheet, tickers: Sequence[str]) -> None:
     quotes = fetch_quotes(tickers)
-    store_quotes(connection, quotes)
+    store_quotes(worksheet, quotes)
     print(f"Stored quotes for {len(quotes)} tickers at {datetime.now()}")
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv or sys.argv[1:])
 
-    connection = open_database(args.database)
-    ensure_schema(connection)
+    worksheet = open_worksheet(
+        spreadsheet_id=args.spreadsheet_id,
+        worksheet_title=args.worksheet,
+        service_account_path=args.service_account,
+    )
 
     tickers = args.tickers
     interval = max(1, args.interval)
 
-    try:
-        while True:
-            try:
-                run_fetch_cycle(connection, tickers)
-            except Exception as exc:
-                print(f"Error during fetch cycle: {exc}", file=sys.stderr)
-            if args.once:
-                break
-            time.sleep(interval)
-    finally:
-        connection.close()
+    while True:
+        try:
+            run_fetch_cycle(worksheet, tickers)
+        except Exception as exc:
+            print(f"Error during fetch cycle: {exc}", file=sys.stderr)
+        if args.once:
+            break
+        time.sleep(interval)
 
     return 0
 
