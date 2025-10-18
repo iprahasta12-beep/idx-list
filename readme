@@ -2,14 +2,14 @@ IDX Quote Automation
 ====================
 
 This project now includes a Python automation script that downloads IDX ticker
-quotes from the public Yahoo Finance API and saves the snapshots into a SQLite
-database every hour.
+quotes from the public Yahoo Finance API and saves the snapshots into a Google
+Sheets worksheet every hour.
 
 How it works
 ------------
 * Tickers covered by default: CMRY, MAIN, BBCA, BMRI, ARCI (queried via the
   `.JK` Yahoo suffix).
-* Quote data is stored in the `data/idx_quotes.db` SQLite database. Each row
+* Quote data is appended to the configured Google Sheets worksheet. Each row
   keeps the fetched price information, OHLC fields (open, day high, day low,
   previous close), along with a `latest_update_label` column similar to
   `"Latest update 14:00"`.
@@ -27,7 +27,10 @@ Useful flags:
 
 * `--once`: Fetch once and exit. Useful for testing.
 * `--interval <seconds>`: Change the fetch frequency.
-* `--database <path>`: Store the SQLite database at a custom location.
 * `--tickers <symbols>`: Override the tickers to fetch.
+* `--spreadsheet-id <id>`: Target Google Spreadsheet ID (required).
+* `--worksheet <title>`: Worksheet to update or create.
+* `--service-account <path>`: Path to a Google service account JSON key.
 
-The script creates the database and table automatically the first time it runs.
+The script creates the worksheet automatically the first time it runs (if it
+does not already exist) and keeps the header row in sync with the stored data.
