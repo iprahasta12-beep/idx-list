@@ -58,22 +58,9 @@
             <span class="font-medium text-slate-800">Last updated: <span id="last-updated" class="font-normal text-slate-400">--</span></span>
           </div>
           </div>
-          <div class="mt-6 flex flex-wrap gap-3 rounded-2xl bg-slate-50/80 p-4 text-sm text-slate-600">
-            <div class="flex flex-col gap-1">
-              <label for="ticker-filter" class="font-semibold text-slate-700">Ticker</label>
-              <select id="ticker-filter" class="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-800 focus:border-aerialPurple focus:outline-none focus:ring-2 focus:ring-aerialPurple/30">
-                <option value="all">All tickers</option>
-              </select>
-            </div>
-            <div class="flex flex-col gap-1">
-              <label for="date-filter" class="font-semibold text-slate-700">Trading date</label>
-              <input type="date" id="date-filter" class="rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-800 focus:border-aerialPurple focus:outline-none focus:ring-2 focus:ring-aerialPurple/30" />
-            </div>
-            <div class="ml-auto flex items-end">
-              <button id="clear-filters" class="rounded-full bg-white px-4 py-2 font-semibold text-aerialPurple shadow-sm shadow-aerialPurple/20 transition hover:bg-aerialLilac/60 focus:outline-none focus:ring-2 focus:ring-aerialPurple/40">
-                Reset filters
-              </button>
-            </div>
+          <div class="mt-6 rounded-2xl bg-slate-50/80 p-4 text-sm text-slate-600">
+            <p class="font-semibold text-slate-700">Latest trading snapshot</p>
+            <p class="mt-1 text-slate-500">Data refreshes automatically every hour on weekdays.</p>
           </div>
 
           <div class="mt-4 overflow-x-auto">
@@ -92,7 +79,7 @@
               <tbody id="trading-table-body" class="text-sm text-slate-700"></tbody>
             </table>
             <div id="trading-empty-state" class="hidden rounded-xl bg-slate-100 px-4 py-6 text-center text-sm text-slate-500">
-              No trades found for the selected filters.
+              No trading data is currently available.
             </div>
           </div>
 
@@ -188,9 +175,6 @@
       const tradingEmptyState = document.getElementById('trading-empty-state');
       const tradingLoading = document.getElementById('trading-loading');
       const tradingError = document.getElementById('trading-error');
-      const tickerFilter = document.getElementById('ticker-filter');
-      const dateFilter = document.getElementById('date-filter');
-      const clearFiltersButton = document.getElementById('clear-filters');
       const tradingDataUrl = 'data/idx-data.csv';
 
       let tradingData = [];
@@ -198,58 +182,39 @@
       const dateFormatter = new Intl.DateTimeFormat(undefined, {
         dateStyle: 'medium',
       });
+      const timestampFormatter = new Intl.DateTimeFormat(undefined, {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+      });
       const priceFormatter = new Intl.NumberFormat('id-ID', {
         maximumFractionDigits: 0,
       });
       const numberFormatter = new Intl.NumberFormat('id-ID');
       let latestTradingDate = null;
-
-      function determineLatestTradingDate() {
-        latestTradingDate =
-          tradingData
-            .map((record) => record.date)
-            .sort()
-            .at(-1) ?? null;
-      }
+      let latestUpdateTimestamp = null;
 
       function updateLastUpdated() {
-        if (!lastUpdatedElement || tradingData.length === 0) {
+        if (!lastUpdatedElement) {
           return;
         }
-        determineLatestTradingDate();
-        if (!latestTradingDate) {
+        if (tradingData.length === 0) {
+          lastUpdatedElement.textContent = '--';
           return;
         }
-        lastUpdatedElement.textContent = dateFormatter.format(
-          new Date(`${latestTradingDate}T00:00:00Z`),
-        );
-      }
-
-      function populateFilters() {
-        if (!tickerFilter || tradingData.length === 0) {
-          return;
-        }
-        determineLatestTradingDate();
-
-        const tickers = Array.from(new Set(tradingData.map((record) => record.symbol))).sort();
-        tickerFilter.innerHTML = '<option value="all">All tickers</option>';
-        tickers.forEach((symbol) => {
-          const option = document.createElement('option');
-          option.value = symbol;
-          option.textContent = symbol;
-          tickerFilter.append(option);
-        });
-
-        if (dateFilter) {
-          const sortedDates = Array.from(new Set(tradingData.map((record) => record.date))).sort();
-          if (sortedDates.length > 0) {
-            dateFilter.min = sortedDates[0];
-            dateFilter.max = sortedDates.at(-1);
-          }
-          if (latestTradingDate) {
-            dateFilter.value = latestTradingDate;
+        if (latestUpdateTimestamp) {
+          const parsed = new Date(latestUpdateTimestamp);
+          if (!Number.isNaN(parsed.getTime())) {
+            lastUpdatedElement.textContent = timestampFormatter.format(parsed);
+            return;
           }
         }
+        if (latestTradingDate) {
+          lastUpdatedElement.textContent = dateFormatter.format(
+            new Date(`${latestTradingDate}T00:00:00Z`),
+          );
+          return;
+        }
+        lastUpdatedElement.textContent = '--';
       }
 
       function renderTable(rows) {
@@ -294,33 +259,6 @@
         });
       }
 
-      function applyFilters() {
-        if (tradingData.length === 0) {
-          renderTable([]);
-          return;
-        }
-
-        const selectedTicker = tickerFilter && tickerFilter.value !== 'all' ? tickerFilter.value : null;
-        const selectedDate = dateFilter && dateFilter.value ? dateFilter.value : latestTradingDate;
-
-        let filtered = tradingData.slice();
-        if (selectedTicker) {
-          filtered = filtered.filter((row) => row.symbol === selectedTicker);
-        }
-        if (selectedDate) {
-          filtered = filtered.filter((row) => row.date === selectedDate);
-        }
-
-        filtered.sort((a, b) => {
-          if (a.date === b.date) {
-            return a.symbol.localeCompare(b.symbol);
-          }
-          return a.date < b.date ? 1 : -1;
-        });
-
-        renderTable(filtered);
-      }
-
       async function loadTradingData() {
         if (!tradingTableBody) {
           return;
@@ -354,6 +292,7 @@
             const highIndex = headers.indexOf('high');
             const closeIndex = headers.indexOf('close');
             const volumeIndex = headers.indexOf('volume');
+            const lastUpdatedIndex = headers.indexOf('last_updated_at');
 
             const parseNumber = (value) => {
               if (value == null) {
@@ -378,12 +317,28 @@
                 high: parseNumber(highIndex >= 0 ? columns[highIndex] : undefined),
                 close: parseNumber(closeIndex >= 0 ? columns[closeIndex] : undefined),
                 volume: parseNumber(volumeIndex >= 0 ? columns[volumeIndex] : undefined),
+                lastUpdatedAt:
+                  lastUpdatedIndex >= 0 ? columns[lastUpdatedIndex]?.trim() ?? '' : '',
               }))
               .filter((row) => row.symbol && row.date);
           }
-          determineLatestTradingDate();
-          populateFilters();
-          applyFilters();
+          latestTradingDate =
+            tradingData
+              .map((record) => record.date)
+              .sort()
+              .at(-1) ?? null;
+          latestUpdateTimestamp =
+            tradingData
+              .map((record) => record.lastUpdatedAt)
+              .filter((timestamp) => timestamp && timestamp.length > 0)
+              .sort()
+              .at(-1) ?? null;
+
+          const rowsToRender = tradingData
+            .filter((row) => (latestTradingDate ? row.date === latestTradingDate : true))
+            .sort((a, b) => a.symbol.localeCompare(b.symbol));
+
+          renderTable(rowsToRender);
           updateLastUpdated();
         } catch (error) {
           if (tradingError) {
@@ -400,19 +355,6 @@
           }
         }
       }
-
-      tickerFilter?.addEventListener('change', applyFilters);
-      dateFilter?.addEventListener('change', applyFilters);
-      clearFiltersButton?.addEventListener('click', (event) => {
-        event.preventDefault();
-        if (tickerFilter) {
-          tickerFilter.value = 'all';
-        }
-        if (dateFilter) {
-          dateFilter.value = latestTradingDate ?? '';
-        }
-        applyFilters();
-      });
 
       document.querySelectorAll('.tab-button').forEach((button) => {
         button.addEventListener('click', () => {

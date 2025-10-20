@@ -3,8 +3,8 @@
 
 This module fetches quote data for a predefined set of IDX tickers from the
 public Yahoo Finance quote API and stores each snapshot inside a local CSV
-file. The task runs every hour by default, but you can override the interval or
-run it once for testing with command-line flags.
+file. The task runs every hour on weekdays by default, but you can override the
+interval or run it once for testing with command-line flags.
 """
 
 from __future__ import annotations
@@ -252,18 +252,15 @@ DEFAULT_TICKERS = [
 ]
 JAKARTA_TZ = ZoneInfo("Asia/Jakarta") if ZoneInfo else None
 
-HEADER_ROW = [
-    "symbol",
-    "short_name",
-    "price",
-    "currency",
-    "regular_market_time",
-    "open_price",
-    "day_high",
-    "day_low",
-    "previous_close",
-    "fetch_time_utc",
-    "latest_update_label",
+OUTPUT_HEADER = [
+    "ticker",
+    "date",
+    "open",
+    "high",
+    "low",
+    "close",
+    "volume",
+    "last_updated_at",
 ]
 
 
@@ -278,6 +275,7 @@ class Quote:
     day_high: float | None
     day_low: float | None
     previous_close: float | None
+    volume: int | None
 
     @classmethod
     def from_yahoo_payload(cls, payload: dict) -> "Quote":
@@ -293,6 +291,12 @@ class Quote:
             market_time = datetime.fromtimestamp(
                 market_time_epoch, tz=timezone.utc
             )
+        volume = payload.get("regularMarketVolume")
+        try:
+            parsed_volume = int(volume) if volume is not None else None
+        except (TypeError, ValueError):
+            parsed_volume = None
+
         return cls(
             symbol=symbol,
             short_name=short_name,
@@ -303,6 +307,7 @@ class Quote:
             day_high=payload.get("regularMarketDayHigh"),
             day_low=payload.get("regularMarketDayLow"),
             previous_close=payload.get("regularMarketPreviousClose"),
+            volume=parsed_volume,
         )
 
 
@@ -340,53 +345,53 @@ def fetch_quotes(tickers: Sequence[str]) -> List[Quote]:
     return quotes
 
 
-def ensure_output_file(path: Path) -> None:
-    """Ensure the CSV output file exists and has the expected header row."""
-
-    if path.exists():
-        return
+def prepare_output_path(path: Path) -> None:
+    """Ensure the destination directory exists."""
 
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", newline="", encoding="utf-8") as csvfile:
-        writer = csv.writer(csvfile)
-        writer.writerow(HEADER_ROW)
 
 
 def store_quotes(csv_path: Path, quotes: Iterable[Quote]) -> None:
-    """Store quotes in the CSV file."""
+    """Store quotes in the CSV file, replacing the previous snapshot."""
 
     rows = list(quotes)
     if not rows:
         raise RuntimeError("No quote data returned from Yahoo Finance.")
 
     now_utc = datetime.now(timezone.utc)
-    if JAKARTA_TZ:
-        jakarta_now = now_utc.astimezone(JAKARTA_TZ)
-    else:  # pragma: no cover - fallback when zoneinfo missing
-        jakarta_now = now_utc
-    latest_update_label = f"Latest update {jakarta_now.strftime('%H:%M')}"
+    jakarta_now = now_utc.astimezone(JAKARTA_TZ) if JAKARTA_TZ else now_utc
+    prepare_output_path(csv_path)
 
-    ensure_output_file(csv_path)
-    with csv_path.open("a", newline="", encoding="utf-8") as csvfile:
+    with csv_path.open("w", newline="", encoding="utf-8") as csvfile:
         writer = csv.writer(csvfile)
+        writer.writerow(OUTPUT_HEADER)
         for quote in rows:
+            trade_reference = quote.regular_market_time or now_utc
+            trade_local = trade_reference.astimezone(JAKARTA_TZ) if JAKARTA_TZ else trade_reference
+            trade_date = trade_local.date().isoformat()
+
             writer.writerow(
                 [
                     quote.symbol,
-                    quote.short_name,
-                    quote.price,
-                    quote.currency,
-                    quote.regular_market_time.isoformat()
-                    if quote.regular_market_time
-                    else None,
-                    quote.open_price,
-                    quote.day_high,
-                    quote.day_low,
-                    quote.previous_close,
-                    now_utc.isoformat(),
-                    latest_update_label,
+                    trade_date,
+                    quote.open_price if quote.open_price is not None else "",
+                    quote.day_high if quote.day_high is not None else "",
+                    quote.day_low if quote.day_low is not None else "",
+                    quote.price if quote.price is not None else "",
+                    quote.volume if quote.volume is not None else "",
+                    jakarta_now.isoformat(),
                 ]
             )
+
+    return None
+
+
+def should_run_now(moment: datetime) -> bool:
+    """Return True when the automation should perform a fetch cycle."""
+
+    # Weekday values: Monday=0, Sunday=6
+    jakarta_moment = moment.astimezone(JAKARTA_TZ) if JAKARTA_TZ else moment
+    return jakarta_moment.weekday() < 5
 
 
 def parse_args(argv: Sequence[str]) -> argparse.Namespace:
@@ -411,7 +416,7 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
     parser.add_argument(
         "--output",
         type=Path,
-        default=Path("data/idx_data.csv"),
+        default=Path("data/idx-data.csv"),
         help="Path to the CSV file where data snapshots are stored.",
     )
     return parser.parse_args(argv)
@@ -420,7 +425,9 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
 def run_fetch_cycle(csv_path: Path, tickers: Sequence[str]) -> None:
     quotes = fetch_quotes(tickers)
     store_quotes(csv_path, quotes)
-    print(f"Stored quotes for {len(quotes)} tickers at {datetime.now()}")
+    print(
+        f"Stored quotes for {len(quotes)} tickers at {datetime.now(timezone.utc).isoformat()}"
+    )
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -431,13 +438,23 @@ def main(argv: Sequence[str] | None = None) -> int:
     output_path = args.output
 
     while True:
-        try:
-            run_fetch_cycle(output_path, tickers)
-        except Exception as exc:
-            print(f"Error during fetch cycle: {exc}", file=sys.stderr)
+        now = datetime.now(timezone.utc)
+        should_fetch = args.once or should_run_now(now)
+        if should_fetch:
+            try:
+                run_fetch_cycle(output_path, tickers)
+            except Exception as exc:
+                print(f"Error during fetch cycle: {exc}", file=sys.stderr)
+        else:
+            print("Skipping fetch cycle outside of weekday trading hours.")
+
         if args.once:
             break
-        time.sleep(interval)
+
+        try:
+            time.sleep(interval)
+        except KeyboardInterrupt:  # pragma: no cover - manual interruption
+            break
 
     return 0
 
