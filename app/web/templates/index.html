@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en" class="h-full bg-slate-100">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>IDX Watchlist</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-pDfmqjJfNke+bBZ5YTBhL0U8nyCLlcQFV3ayhtq/Y5cHIzoHmr18bODsPwhjNz1OMGNJUgIAQ9lGWp+lJQ38lQ==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <link rel="stylesheet" href="/static/tailwind.css" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script src="/static/main.js" defer></script>
+  </head>
+  <body class="h-full">
+    <div class="min-h-full">
+      <header class="bg-white shadow">
+        <div class="mx-auto max-w-6xl px-4 py-4 sm:px-6 lg:px-8">
+          <h1 class="text-2xl font-bold leading-tight tracking-tight text-slate-900">IDX Trading Monitor</h1>
+          <p class="text-sm text-slate-500">Hourly refreshed quotes with core technical indicators for Indonesian equities.</p>
+        </div>
+      </header>
+      <main class="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
+        <div
+          id="summary-fragment"
+          class="min-h-[200px]"
+          hx-get="/partials/summary"
+          hx-trigger="load"
+          hx-target="#summary-fragment"
+          hx-swap="innerHTML"
+        >
+          <div class="flex h-40 items-center justify-center text-slate-500">
+            <span class="loader mr-2 h-4 w-4 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent"></span>
+            Loading summary…
+          </div>
+        </div>
+      </main>
+      <footer class="border-t border-slate-200 bg-white py-4">
+        <div class="mx-auto max-w-6xl px-4 text-xs text-slate-500 sm:px-6 lg:px-8">
+          Data courtesy of Yahoo Finance. Quotes delayed. Built for IDX equities.
+        </div>
+      </footer>
+    </div>
+  </body>
+</html>

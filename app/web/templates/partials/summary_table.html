@@ -1,0 +1,105 @@
+<div class="space-y-4" id="summary-inner">
+  <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+    <div>
+      <h1 class="text-xl font-semibold text-slate-900">IDX Watchlist</h1>
+      <p class="text-sm text-slate-500">{{ total }} symbols tracked • Showing {{ rows|length }} per page</p>
+    </div>
+    <div class="flex items-center gap-2">
+      <input
+        id="search"
+        name="search"
+        type="search"
+        placeholder="Filter by ticker"
+        value="{{ search }}"
+        class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 sm:w-60"
+        hx-get="/partials/summary"
+        hx-trigger="keyup changed delay:400ms"
+        hx-target="#summary-fragment"
+        hx-include="closest div"
+      />
+      <button
+        class="rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-600 shadow-sm hover:bg-slate-50"
+        hx-get="/partials/summary"
+        hx-target="#summary-fragment"
+      >Reset</button>
+    </div>
+  </div>
+  <div class="overflow-x-auto rounded-lg border border-slate-200 shadow-sm">
+    <table class="min-w-full divide-y divide-slate-200">
+      <thead class="bg-slate-50">
+        <tr class="text-left text-xs font-semibold uppercase tracking-wide text-slate-600">
+          {% set columns = [
+            ("symbol", "Ticker"),
+            ("last_close", "Last Close"),
+            ("pct_change_1d", "%Δ (1d)"),
+            ("ma20", "MA20"),
+            ("ma50", "MA50"),
+            ("rsi14", "RSI14"),
+            ("is_30d_high", "30D High?"),
+            ("signal", "Signal"),
+            ("updated_wib", "Updated (WIB)")
+          ] %}
+          {% for field, label in columns %}
+          {% set next_dir = 'desc' if sort == field and direction == 'asc' else 'asc' %}
+          <th scope="col" class="px-4 py-3">
+            <button
+              class="flex items-center gap-1 text-xs font-semibold uppercase tracking-wider text-slate-600 hover:text-indigo-600"
+              hx-get="/partials/summary?sort={{ field }}&direction={{ next_dir }}&search={{ search|urlencode }}&page=1"
+              hx-target="#summary-fragment"
+            >
+              <span>{{ label }}</span>
+              {% if sort == field %}
+              <svg class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                {% if direction == 'asc' %}
+                <path fill-rule="evenodd" d="M10 5l5 6H5l5-6z" clip-rule="evenodd" />
+                {% else %}
+                <path fill-rule="evenodd" d="M10 15l-5-6h10l-5 6z" clip-rule="evenodd" />
+                {% endif %}
+              </svg>
+              {% endif %}
+            </button>
+          </th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody id="summary-body" class="divide-y divide-slate-200 bg-white text-sm text-slate-700">
+        {% for row in rows %}
+        <tr class="hover:bg-indigo-50/50" data-signal="{{ 'true' if row.signal else 'false' }}">
+          <td class="px-4 py-3 font-semibold text-indigo-600">{{ row.symbol }}</td>
+          <td class="px-4 py-3">{{ row.last_close | default('-', true) | round(2) if row.last_close is not none else '—' }}</td>
+          <td class="px-4 py-3 {% if row.pct_change_1d is not none and row.pct_change_1d < 0 %}text-red-600{% elif row.pct_change_1d is not none %}text-emerald-600{% endif %}">
+            {% if row.pct_change_1d is none %}—{% else %}{{ '%.2f'|format(row.pct_change_1d) }}%{% endif %}
+          </td>
+          <td class="px-4 py-3">{% if row.ma20 is none %}—{% else %}{{ '%.2f'|format(row.ma20) }}{% endif %}</td>
+          <td class="px-4 py-3">{% if row.ma50 is none %}—{% else %}{{ '%.2f'|format(row.ma50) }}{% endif %}</td>
+          <td class="px-4 py-3">{% if row.rsi14 is none %}—{% else %}{{ '%.1f'|format(row.rsi14) }}{% endif %}</td>
+          <td class="px-4 py-3 text-center">{% if row.is_30d_high %}✓{% else %}—{% endif %}</td>
+          <td class="px-4 py-3 text-center">{% if row.signal %}✓{% else %}—{% endif %}</td>
+          <td class="px-4 py-3">{{ row.updated_wib }}</td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="9" class="px-4 py-6 text-center text-slate-500">No data available. Run the fetcher to populate prices.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="flex flex-col items-center justify-between gap-3 text-sm text-slate-600 sm:flex-row">
+    <div>Page {{ page }} of {{ total_pages }}</div>
+    <div class="flex items-center gap-2">
+      <button
+        class="rounded-md border border-slate-300 px-3 py-1 shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
+        hx-get="/partials/summary?page={{ page - 1 if page > 1 else 1 }}&sort={{ sort }}&direction={{ direction }}&search={{ search|urlencode }}"
+        hx-target="#summary-fragment"
+        {% if page == 1 %}disabled{% endif %}
+      >Prev</button>
+      <button
+        class="rounded-md border border-slate-300 px-3 py-1 shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
+        hx-get="/partials/summary?page={{ page + 1 if page < total_pages else total_pages }}&sort={{ sort }}&direction={{ direction }}&search={{ search|urlencode }}"
+        hx-target="#summary-fragment"
+        {% if page >= total_pages %}disabled{% endif %}
+      >Next</button>
+    </div>
+  </div>
+</div>
