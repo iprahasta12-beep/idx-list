@@ -2,14 +2,15 @@
 """Automate fetching IDX ticker data from Yahoo Finance.
 
 This module fetches quote data for a predefined set of IDX tickers from the
-public Yahoo Finance quote API and stores each snapshot inside a Google Sheets
-worksheet. The task runs every hour by default, but you can override the
-interval or run it once for testing with command-line flags.
+public Yahoo Finance quote API and stores each snapshot inside a local CSV
+file. The task runs every hour by default, but you can override the interval or
+run it once for testing with command-line flags.
 """
 
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import sys
 import time
@@ -21,15 +22,6 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 try:
-    import gspread
-    from gspread.exceptions import WorksheetNotFound
-except ImportError as exc:  # pragma: no cover - dependency injection
-    raise SystemExit(
-        "The 'gspread' package is required to run this script. Install it with"
-        " 'pip install gspread google-auth'."
-    ) from exc
-
-try:
     from zoneinfo import ZoneInfo
 except ImportError:  # pragma: no cover - Python < 3.9 not expected
     ZoneInfo = None  # type: ignore
@@ -38,7 +30,226 @@ except ImportError:  # pragma: no cover - Python < 3.9 not expected
 DEFAULT_INTERVAL_SECONDS = 60 * 60  # 1 hour
 IDX_SUFFIX = ".JK"
 YAHOO_QUOTE_URL = "https://query1.finance.yahoo.com/v7/finance/quote"
-DEFAULT_TICKERS = ["CMRY", "MAIN", "BBCA", "BMRI", "ARCI"]
+DEFAULT_TICKERS = [
+    "BBCA",
+    "TPIA",
+    "BREN",
+    "BBRI",
+    "AMMN",
+    "BMRI",
+    "DSSA",
+    "TLKM",
+    "PANI",
+    "ASII",
+    "BBNI",
+    "BRPT",
+    "CUAN",
+    "ICBP",
+    "BRIS",
+    "AMRT",
+    "BNLI",
+    "ANTM",
+    "UNTR",
+    "CPIN",
+    "KLBF",
+    "INDF",
+    "ISAT",
+    "PGEO",
+    "ADRO",
+    "UNVR",
+    "AADI",
+    "MDKA",
+    "CASA",
+    "TBIG",
+    "MYOR",
+    "BNGA",
+    "ADMR",
+    "PGAS",
+    "EXCL",
+    "CMRY",
+    "INCO",
+    "MEDC",
+    "CBDK",
+    "MIKA",
+    "PTBA",
+    "INKP",
+    "NISP",
+    "PTRO",
+    "PNBN",
+    "SILO",
+    "JSMR",
+    "TCPI",
+    "ITMG",
+    "AKRA",
+    "ARTO",
+    "BDMN",
+    "FILM",
+    "SRTG",
+    "RATU",
+    "HEAL",
+    "INTP",
+    "MAPI",
+    "SMGR",
+    "TAPG",
+    "GGRM",
+    "BSDE",
+    "TKIM",
+    "JPFA",
+    "CTRA",
+    "BBTN",
+    "CMNT",
+    "APIC",
+    "ULTJ",
+    "SSMS",
+    "NICL",
+    "BANK",
+    "BFIN",
+    "HRUM",
+    "RAJA",
+    "AALI",
+    "SMSM",
+    "TSPC",
+    "BSSR",
+    "RISE",
+    "BTPS",
+    "AUTO",
+    "JRPT",
+    "BJBR",
+    "LSIP",
+    "STAA",
+    "ABMM",
+    "TINS",
+    "DSNG",
+    "CMNP",
+    "INDY",
+    "PACK",
+    "TOBA",
+    "SSIA",
+    "CYBR",
+    "BALI",
+    "ANJT",
+    "NOBU",
+    "ROTI",
+    "BIRD",
+    "WIFI",
+    "CBUT",
+    "DRMA",
+    "SGRO",
+    "MSTI",
+    "HEXA",
+    "TBLA",
+    "MPMX",
+    "MBSS",
+    "SMDM",
+    "PNIN",
+    "GJTL",
+    "LPPF",
+    "TUGU",
+    "IMAS",
+    "AGII",
+    "KEEN",
+    "BNBA",
+    "BISI",
+    "BOLT",
+    "ASSA",
+    "PRDA",
+    "ARKO",
+    "SUNI",
+    "IPCC",
+    "MTMH",
+    "DATA",
+    "CEKA",
+    "WIIM",
+    "ASGR",
+    "PANR",
+    "PKPK",
+    "ITMA",
+    "FORU",
+    "PNSE",
+    "KARW",
+    "RIGS",
+    "CLPI",
+    "MREI",
+    "IMPC",
+    "CFIN",
+    "NSSS",
+    "SMDR",
+    "NICE",
+    "ISSP",
+    "SGER",
+    "BPFI",
+    "ENRG",
+    "MKAP",
+    "AIMS",
+    "OBAT",
+    "WOOD",
+    "DMMX",
+    "GPSO",
+    "PBSA",
+    "JARR",
+    "KKGI",
+    "PWON",
+    "SMRA",
+    "PTMR",
+    "WINS",
+    "MBMA",
+    "KOPI",
+    "BRMS",
+    "UNIQ",
+    "RALS",
+    "RSCH",
+    "MIDI",
+    "DOID",
+    "IRRA",
+    "AVIA",
+    "DKFT",
+    "PTPP",
+    "PSAB",
+    "AREA",
+    "LPGI",
+    "SIMP",
+    "DGWG",
+    "MICE",
+    "ELSA",
+    "EMTK",
+    "BJTM",
+    "SIDO",
+    "TOWR",
+    "MSIN",
+    "UCID",
+    "PDPP",
+    "ERAA",
+    "MMLP",
+    "RMKE",
+    "ACES",
+    "MTEL",
+    "MTDL",
+    "SNLK",
+    "MINE",
+    "ARCI",
+    "TPMA",
+    "HRTA",
+    "ARNA",
+    "ESSA",
+    "JIHD",
+    "BIKE",
+    "HMSP",
+    "MAIN",
+    "ALII",
+    "TEBE",
+    "VICI",
+    "MAPA",
+    "FORE",
+    "NCKL",
+    "SPTO",
+    "BHAT",
+    "CLEO",
+    "TOTL",
+    "MGRO",
+    "KAEF",
+    "POWR",
+    "BBLD",
+]
 JAKARTA_TZ = ZoneInfo("Asia/Jakarta") if ZoneInfo else None
 
 HEADER_ROW = [
@@ -129,16 +340,24 @@ def fetch_quotes(tickers: Sequence[str]) -> List[Quote]:
     return quotes
 
 
-def ensure_header_row(worksheet: gspread.Worksheet) -> None:
-    """Ensure the worksheet has the expected header row."""
+def ensure_output_file(path: Path) -> None:
+    """Ensure the CSV output file exists and has the expected header row."""
 
-    existing_header = worksheet.row_values(1)
-    if existing_header != HEADER_ROW:
-        worksheet.update(f"A1:K1", [HEADER_ROW])
+    if path.exists():
+        return
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", newline="", encoding="utf-8") as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerow(HEADER_ROW)
 
 
-def store_quotes(worksheet: gspread.Worksheet, quotes: Iterable[Quote]) -> None:
-    """Store quotes in the Google Sheets worksheet."""
+def store_quotes(csv_path: Path, quotes: Iterable[Quote]) -> None:
+    """Store quotes in the CSV file."""
+
+    rows = list(quotes)
+    if not rows:
+        raise RuntimeError("No quote data returned from Yahoo Finance.")
 
     now_utc = datetime.now(timezone.utc)
     if JAKARTA_TZ:
@@ -147,48 +366,27 @@ def store_quotes(worksheet: gspread.Worksheet, quotes: Iterable[Quote]) -> None:
         jakarta_now = now_utc
     latest_update_label = f"Latest update {jakarta_now.strftime('%H:%M')}"
 
-    rows = [
-        (
-            quote.symbol,
-            quote.short_name,
-            quote.price,
-            quote.currency,
-            quote.regular_market_time.isoformat() if quote.regular_market_time else None,
-            quote.open_price,
-            quote.day_high,
-            quote.day_low,
-            quote.previous_close,
-            now_utc.isoformat(),
-            latest_update_label,
-        )
-        for quote in quotes
-    ]
-
-    if not rows:
-        raise RuntimeError("No quote data returned from Yahoo Finance.")
-
-    ensure_header_row(worksheet)
-    worksheet.append_rows(rows, value_input_option="USER_ENTERED")
-
-
-def open_worksheet(
-    spreadsheet_id: str,
-    worksheet_title: str,
-    service_account_path: Path | None,
-) -> gspread.Worksheet:
-    """Open the target Google Sheets worksheet, creating it if needed."""
-
-    if service_account_path is not None:
-        client = gspread.service_account(filename=str(service_account_path))
-    else:
-        client = gspread.service_account()
-
-    spreadsheet = client.open_by_key(spreadsheet_id)
-    try:
-        worksheet = spreadsheet.worksheet(worksheet_title)
-    except WorksheetNotFound:
-        worksheet = spreadsheet.add_worksheet(title=worksheet_title, rows="1000", cols="20")
-    return worksheet
+    ensure_output_file(csv_path)
+    with csv_path.open("a", newline="", encoding="utf-8") as csvfile:
+        writer = csv.writer(csvfile)
+        for quote in rows:
+            writer.writerow(
+                [
+                    quote.symbol,
+                    quote.short_name,
+                    quote.price,
+                    quote.currency,
+                    quote.regular_market_time.isoformat()
+                    if quote.regular_market_time
+                    else None,
+                    quote.open_price,
+                    quote.day_high,
+                    quote.day_low,
+                    quote.previous_close,
+                    now_utc.isoformat(),
+                    latest_update_label,
+                ]
+            )
 
 
 def parse_args(argv: Sequence[str]) -> argparse.Namespace:
@@ -211,48 +409,30 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
         help="Fetch once and exit instead of running continuously.",
     )
     parser.add_argument(
-        "--spreadsheet-id",
-        required=True,
-        help="ID of the Google Spreadsheet to update.",
-    )
-    parser.add_argument(
-        "--worksheet",
-        default="Quotes",
-        help="Worksheet title to update or create (default: %(default)s).",
-    )
-    parser.add_argument(
-        "--service-account",
+        "--output",
         type=Path,
-        default=None,
-        help=(
-            "Path to a Google service account JSON key. If omitted,"
-            " gspread's default discovery is used."
-        ),
+        default=Path("data/idx_data.csv"),
+        help="Path to the CSV file where data snapshots are stored.",
     )
     return parser.parse_args(argv)
 
 
-def run_fetch_cycle(worksheet: gspread.Worksheet, tickers: Sequence[str]) -> None:
+def run_fetch_cycle(csv_path: Path, tickers: Sequence[str]) -> None:
     quotes = fetch_quotes(tickers)
-    store_quotes(worksheet, quotes)
+    store_quotes(csv_path, quotes)
     print(f"Stored quotes for {len(quotes)} tickers at {datetime.now()}")
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv or sys.argv[1:])
 
-    worksheet = open_worksheet(
-        spreadsheet_id=args.spreadsheet_id,
-        worksheet_title=args.worksheet,
-        service_account_path=args.service_account,
-    )
-
     tickers = args.tickers
     interval = max(1, args.interval)
+    output_path = args.output
 
     while True:
         try:
-            run_fetch_cycle(worksheet, tickers)
+            run_fetch_cycle(output_path, tickers)
         except Exception as exc:
             print(f"Error during fetch cycle: {exc}", file=sys.stderr)
         if args.once:
