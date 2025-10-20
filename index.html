@@ -217,6 +217,13 @@
         lastUpdatedElement.textContent = '--';
       }
 
+      function normalizeSymbol(symbol) {
+        if (typeof symbol !== 'string') {
+          return '';
+        }
+        return symbol.endsWith('.JK') ? symbol.slice(0, -3) : symbol;
+      }
+
       function renderTable(rows) {
         if (!tradingTableBody) {
           return;
@@ -239,7 +246,7 @@
           tr.className = 'bg-slate-100/70';
 
           const cells = [
-            row.symbol,
+            normalizeSymbol(row.symbol),
             row.open != null ? priceFormatter.format(row.open) : '—',
             row.high != null ? priceFormatter.format(row.high) : '—',
             row.close != null ? priceFormatter.format(row.close) : '—',
@@ -377,6 +384,7 @@
       });
 
       loadTradingData();
+      setInterval(loadTradingData, 60 * 60 * 1000);
     </script>
   </body>
 </html>
