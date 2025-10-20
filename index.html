@@ -86,7 +86,6 @@
                   <th class="bg-slate-50 px-4 py-3">Ticker</th>
                   <th class="bg-slate-50 px-4 py-3">Open</th>
                   <th class="bg-slate-50 px-4 py-3">High</th>
-                  <th class="bg-slate-50 px-4 py-3">Low</th>
                   <th class="bg-slate-50 px-4 py-3">Close</th>
                   <th class="rounded-r-xl bg-slate-50 px-4 py-3">Volume</th>
                 </tr>
@@ -193,7 +192,7 @@
       const tickerFilter = document.getElementById('ticker-filter');
       const dateFilter = document.getElementById('date-filter');
       const clearFiltersButton = document.getElementById('clear-filters');
-      const tradingDataUrl = 'data/trading_history.json';
+      const tradingDataUrl = 'data/idx-data.csv';
 
       let tradingData = [];
 
@@ -269,7 +268,6 @@
             row.symbol,
             row.open != null ? currencyFormatter.format(row.open) : '—',
             row.high != null ? currencyFormatter.format(row.high) : '—',
-            row.low != null ? currencyFormatter.format(row.low) : '—',
             row.close != null ? currencyFormatter.format(row.close) : '—',
             row.volume != null ? numberFormatter.format(row.volume) : '—',
           ];
@@ -331,8 +329,49 @@
           if (!response.ok) {
             throw new Error(`HTTP ${response.status}`);
           }
-          const payload = await response.json();
-          tradingData = Array.isArray(payload) ? payload : [];
+          const text = await response.text();
+          const lines = text
+            .trim()
+            .split(/\r?\n/)
+            .filter((line) => line.trim().length > 0);
+
+          if (lines.length <= 1) {
+            tradingData = [];
+          } else {
+            const headers = lines[0].split(',').map((header) => header.trim());
+            const tickerIndex = headers.indexOf('ticker');
+            const dateIndex = headers.indexOf('date');
+            const openIndex = headers.indexOf('open');
+            const highIndex = headers.indexOf('high');
+            const closeIndex = headers.indexOf('close');
+            const volumeIndex = headers.indexOf('volume');
+
+            const parseNumber = (value) => {
+              if (value == null) {
+                return null;
+              }
+              const trimmed = value.trim();
+              if (trimmed === '') {
+                return null;
+              }
+              const number = Number(trimmed);
+              return Number.isFinite(number) ? number : null;
+            };
+
+            tradingData = lines
+              .slice(1)
+              .map((line) => line.split(','))
+              .filter((columns) => columns.length === headers.length)
+              .map((columns) => ({
+                symbol: tickerIndex >= 0 ? columns[tickerIndex]?.trim() ?? '' : '',
+                date: dateIndex >= 0 ? columns[dateIndex]?.trim() ?? '' : '',
+                open: parseNumber(openIndex >= 0 ? columns[openIndex] : undefined),
+                high: parseNumber(highIndex >= 0 ? columns[highIndex] : undefined),
+                close: parseNumber(closeIndex >= 0 ? columns[closeIndex] : undefined),
+                volume: parseNumber(volumeIndex >= 0 ? columns[volumeIndex] : undefined),
+              }))
+              .filter((row) => row.symbol && row.date);
+          }
           populateFilters();
           applyFilters();
           updateLastUpdated();
