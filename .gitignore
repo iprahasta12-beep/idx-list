@@ -1,5 +1,0 @@
-# Ignore SQLite databases created by automation scripts
-*.db
-*.db-journal
-*.sqlite
-*.sqlite3
