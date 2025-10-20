@@ -20,7 +20,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable, Iterator, List, Sequence
 from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
+from urllib.request import ProxyHandler, Request, build_opener, urlopen
 
 try:
     from zoneinfo import ZoneInfo
@@ -343,15 +343,28 @@ def fetch_quotes(tickers: Sequence[str]) -> List[Quote]:
     for batch in _chunked(list(tickers), MAX_TICKERS_PER_REQUEST):
         url = build_quote_url(batch)
         request = Request(url, headers={"User-Agent": "Mozilla/5.0"})
-        try:
-            with urlopen(request, timeout=30) as response:
-                payload = json.load(response)
-        except HTTPError as exc:  # pragma: no cover - relies on external API
-            raise RuntimeError(
-                f"Yahoo Finance returned HTTP {exc.code}: {exc.reason}"
-            ) from exc
-        except URLError as exc:  # pragma: no cover - relies on network conditions
-            raise RuntimeError(f"Failed to fetch Yahoo Finance data: {exc}") from exc
+        payload: dict | None = None
+        last_error: Exception | None = None
+        for opener in (None, build_opener(ProxyHandler({}))):
+            try:
+                if opener is None:
+                    response_context = urlopen(request, timeout=30)
+                else:
+                    response_context = opener.open(request, timeout=30)
+                with response_context as response:
+                    payload = json.load(response)
+                break
+            except HTTPError as exc:  # pragma: no cover - relies on external API
+                last_error = RuntimeError(
+                    f"Yahoo Finance returned HTTP {exc.code}: {exc.reason}"
+                )
+            except URLError as exc:  # pragma: no cover - relies on network conditions
+                last_error = RuntimeError(
+                    f"Failed to fetch Yahoo Finance data: {exc}"
+                )
+        if payload is None:
+            assert last_error is not None
+            raise last_error
 
         results = payload.get("quoteResponse", {}).get("result", [])
         quotes.extend(Quote.from_yahoo_payload(result) for result in results)
