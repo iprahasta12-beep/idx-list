@@ -1,0 +1,13 @@
+{
+  "timezone": "Asia/Jakarta",
+  "quote_period": "5d",
+  "quote_interval": "1h",
+  "indicator_period": "180d",
+  "indicator_interval": "1d",
+  "indicator_ma_short": 20,
+  "indicator_ma_long": 50,
+  "indicator_rsi_period": 14,
+  "indicator_max_window": 30,
+  "snapshot_format": "%Y%m%d_%H%M",
+  "retention_hours": 720
+}
