@@ -2,25 +2,25 @@ IDX Quote Automation
 ====================
 
 This project now includes a Python automation script that downloads IDX ticker
-quotes from the public Yahoo Finance API and saves the snapshots into a Google
-Sheets worksheet every hour.
+quotes from the public Yahoo Finance API and rewrites the dashboard CSV
+snapshot every weekday hour.
 
 How it works
 ------------
 * Tickers covered by default: CMRY, MAIN, BBCA, BMRI, ARCI (queried via the
   `.JK` Yahoo suffix).
-* Quote data is appended to the configured Google Sheets worksheet. Each row
-  keeps the fetched price information, OHLC fields (open, day high, day low,
-  previous close), along with a `latest_update_label` column similar to
-  `"Latest update 14:00"`.
-* Fetches run every hour by default, but you can override the interval with a
-  command-line flag.
+* Quote data replaces the existing `data/idx-data.csv` file so the dashboard
+  always renders the most recent snapshot for the current trading date. Each
+  row records the symbol, OHLC values, volume, and an ISO timestamp stored in
+  the `last_updated_at` column.
+* Fetches run every hour by default (skipping weekends automatically), but you
+  can override the interval with a command-line flag.
 
 Running the automation
 ----------------------
 
 ```bash
-python automation/fetch_idx_quotes.py
+python automation/fetch_idx_quotes.py --output data/idx-data.csv
 ```
 
 Useful flags:
@@ -28,12 +28,7 @@ Useful flags:
 * `--once`: Fetch once and exit. Useful for testing.
 * `--interval <seconds>`: Change the fetch frequency.
 * `--tickers <symbols>`: Override the tickers to fetch.
-* `--spreadsheet-id <id>`: Target Google Spreadsheet ID (required).
-* `--worksheet <title>`: Worksheet to update or create.
-* `--service-account <path>`: Path to a Google service account JSON key.
-
-The script creates the worksheet automatically the first time it runs (if it
-does not already exist) and keeps the header row in sync with the stored data.
+* `--output <path>`: Write the snapshot to a different CSV file.
 
 Historical OCHV storage
 -----------------------
@@ -49,6 +44,6 @@ python automation/fetch_idx_history.py --db-path data/idx_ochv.sqlite3 --export-
 By default the script downloads candles for the five featured IDX tickers from
 1 August 2024 up to today. Results are persisted into a local
 `data/idx_ochv.sqlite3` database (generated on demand and ignored by git) and
-optionally exported as `data/trading_history.json`, which powers the front-end
-filter. The script uses an upsert strategy so re-running it will update
-existing rows without creating duplicates.
+optionally exported as `data/trading_history.json` for further analysis. The
+script uses an upsert strategy so re-running it will update existing rows
+without creating duplicates.
