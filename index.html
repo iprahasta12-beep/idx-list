@@ -175,7 +175,7 @@
       const tradingEmptyState = document.getElementById('trading-empty-state');
       const tradingLoading = document.getElementById('trading-loading');
       const tradingError = document.getElementById('trading-error');
-      const tradingDataUrl = 'data/idx-data.csv';
+      const tradingDataUrl = 'data/quotes.csv';
 
       let tradingData = [];
 
@@ -295,11 +295,32 @@
             const headers = lines[0].split(',').map((header) => header.trim());
             const tickerIndex = headers.indexOf('ticker');
             const dateIndex = headers.indexOf('date');
+            const datetimeIndex = headers.indexOf('datetime');
             const openIndex = headers.indexOf('open');
             const highIndex = headers.indexOf('high');
             const closeIndex = headers.indexOf('close');
             const volumeIndex = headers.indexOf('volume');
             const lastUpdatedIndex = headers.indexOf('last_updated_at');
+
+            const extractDate = (rawDate, rawDateTime) => {
+              const candidate = rawDate?.trim() ?? '';
+              if (candidate) {
+                return candidate;
+              }
+              const dateTimeCandidate = rawDateTime?.trim() ?? '';
+              if (!dateTimeCandidate) {
+                return '';
+              }
+              const parsed = new Date(dateTimeCandidate);
+              if (!Number.isNaN(parsed.getTime())) {
+                return parsed.toISOString().slice(0, 10);
+              }
+              const isoLikeMatch = dateTimeCandidate.match(/^(\d{4}-\d{2}-\d{2})/);
+              if (isoLikeMatch) {
+                return isoLikeMatch[1];
+              }
+              return '';
+            };
 
             const parseNumber = (value) => {
               if (value == null) {
@@ -319,13 +340,20 @@
               .filter((columns) => columns.length === headers.length)
               .map((columns) => ({
                 symbol: tickerIndex >= 0 ? columns[tickerIndex]?.trim() ?? '' : '',
-                date: dateIndex >= 0 ? columns[dateIndex]?.trim() ?? '' : '',
+                date: extractDate(
+                  dateIndex >= 0 ? columns[dateIndex] : undefined,
+                  datetimeIndex >= 0 ? columns[datetimeIndex] : undefined,
+                ),
                 open: parseNumber(openIndex >= 0 ? columns[openIndex] : undefined),
                 high: parseNumber(highIndex >= 0 ? columns[highIndex] : undefined),
                 close: parseNumber(closeIndex >= 0 ? columns[closeIndex] : undefined),
                 volume: parseNumber(volumeIndex >= 0 ? columns[volumeIndex] : undefined),
                 lastUpdatedAt:
-                  lastUpdatedIndex >= 0 ? columns[lastUpdatedIndex]?.trim() ?? '' : '',
+                  lastUpdatedIndex >= 0
+                    ? columns[lastUpdatedIndex]?.trim() ?? ''
+                    : datetimeIndex >= 0
+                    ? columns[datetimeIndex]?.trim() ?? ''
+                    : '',
               }))
               .filter((row) => row.symbol && row.date);
           }
