@@ -30,6 +30,7 @@ except ImportError:  # pragma: no cover - Python < 3.9 not expected
 DEFAULT_INTERVAL_SECONDS = 60 * 60  # 1 hour
 IDX_SUFFIX = ".JK"
 YAHOO_QUOTE_URL = "https://query1.finance.yahoo.com/v7/finance/quote"
+YAHOO_MAX_SYMBOLS_PER_REQUEST = 50
 DEFAULT_TICKERS = [
     "BBCA",
     "TPIA",
@@ -151,6 +152,7 @@ DEFAULT_TICKERS = [
     "BNBA",
     "BISI",
     "BOLT",
+    "MARK",
     "ASSA",
     "PRDA",
     "ARKO",
@@ -327,21 +329,46 @@ def build_quote_url(tickers: Sequence[str]) -> str:
     return f"{YAHOO_QUOTE_URL}?symbols={symbols}"
 
 
+def _chunked(sequence: Sequence[str], size: int) -> Iterable[Sequence[str]]:
+    """Yield the sequence in chunks of ``size`` elements."""
+
+    if size <= 0:
+        yield sequence
+        return
+
+    for start in range(0, len(sequence), size):
+        yield sequence[start : start + size]
+
+
 def fetch_quotes(tickers: Sequence[str]) -> List[Quote]:
-    """Fetch quote data from Yahoo Finance."""
+    """Fetch quote data from Yahoo Finance in manageable batches."""
 
-    url = build_quote_url(tickers)
-    request = Request(url, headers={"User-Agent": "Mozilla/5.0"})
-    try:
-        with urlopen(request, timeout=30) as response:
-            payload = json.load(response)
-    except HTTPError as exc:  # pragma: no cover - relies on external API
-        raise RuntimeError(f"Yahoo Finance returned HTTP {exc.code}: {exc.reason}") from exc
-    except URLError as exc:  # pragma: no cover - relies on network conditions
-        raise RuntimeError(f"Failed to fetch Yahoo Finance data: {exc}") from exc
+    unique_tickers: List[str] = []
+    seen: set[str] = set()
+    for ticker in tickers:
+        normalized = ticker.strip().upper()
+        if not normalized or normalized in seen:
+            continue
+        unique_tickers.append(normalized)
+        seen.add(normalized)
 
-    results = payload.get("quoteResponse", {}).get("result", [])
-    quotes = [Quote.from_yahoo_payload(result) for result in results]
+    quotes: List[Quote] = []
+    for chunk in _chunked(unique_tickers, YAHOO_MAX_SYMBOLS_PER_REQUEST):
+        url = build_quote_url(chunk)
+        request = Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        try:
+            with urlopen(request, timeout=30) as response:
+                payload = json.load(response)
+        except HTTPError as exc:  # pragma: no cover - relies on external API
+            raise RuntimeError(
+                f"Yahoo Finance returned HTTP {exc.code}: {exc.reason}"
+            ) from exc
+        except URLError as exc:  # pragma: no cover - relies on network conditions
+            raise RuntimeError(f"Failed to fetch Yahoo Finance data: {exc}") from exc
+
+        results = payload.get("quoteResponse", {}).get("result", [])
+        quotes.extend(Quote.from_yahoo_payload(result) for result in results)
+
     return quotes
 
 
@@ -351,7 +378,9 @@ def prepare_output_path(path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
 
 
-def store_quotes(csv_path: Path, quotes: Iterable[Quote]) -> None:
+def store_quotes(
+    csv_path: Path, quotes: Iterable[Quote], requested_tickers: Sequence[str]
+) -> None:
     """Store quotes in the CSV file, replacing the previous snapshot."""
 
     rows = list(quotes)
@@ -362,12 +391,42 @@ def store_quotes(csv_path: Path, quotes: Iterable[Quote]) -> None:
     jakarta_now = now_utc.astimezone(JAKARTA_TZ) if JAKARTA_TZ else now_utc
     prepare_output_path(csv_path)
 
+    normalized_requested = [ticker_with_suffix(t) for t in requested_tickers]
+    quotes_by_symbol = {quote.symbol.upper(): quote for quote in rows}
+    missing_symbols: list[str] = []
+
     with csv_path.open("w", newline="", encoding="utf-8") as csvfile:
         writer = csv.writer(csvfile)
         writer.writerow(OUTPUT_HEADER)
-        for quote in rows:
+
+        for symbol in normalized_requested:
+            quote = quotes_by_symbol.get(symbol.upper())
+            if quote is None:
+                missing_symbols.append(symbol)
+                trade_reference = now_utc
+                trade_date = (
+                    trade_reference.astimezone(JAKARTA_TZ).date().isoformat()
+                    if JAKARTA_TZ
+                    else trade_reference.date().isoformat()
+                )
+                writer.writerow([
+                    symbol,
+                    trade_date,
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    jakarta_now.isoformat(),
+                ])
+                continue
+
             trade_reference = quote.regular_market_time or now_utc
-            trade_local = trade_reference.astimezone(JAKARTA_TZ) if JAKARTA_TZ else trade_reference
+            trade_local = (
+                trade_reference.astimezone(JAKARTA_TZ)
+                if JAKARTA_TZ
+                else trade_reference
+            )
             trade_date = trade_local.date().isoformat()
 
             writer.writerow(
@@ -382,6 +441,13 @@ def store_quotes(csv_path: Path, quotes: Iterable[Quote]) -> None:
                     jakarta_now.isoformat(),
                 ]
             )
+
+    if missing_symbols:
+        print(
+            "Warning: missing quote data for",
+            ", ".join(sorted(missing_symbols)),
+            file=sys.stderr,
+        )
 
     return None
 
@@ -416,7 +482,7 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
     parser.add_argument(
         "--output",
         type=Path,
-        default=Path("data/idx-data.csv"),
+        default=Path("data/idx-list.csv"),
         help="Path to the CSV file where data snapshots are stored.",
     )
     return parser.parse_args(argv)
@@ -424,7 +490,7 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
 
 def run_fetch_cycle(csv_path: Path, tickers: Sequence[str]) -> None:
     quotes = fetch_quotes(tickers)
-    store_quotes(csv_path, quotes)
+    store_quotes(csv_path, quotes, tickers)
     print(
         f"Stored quotes for {len(quotes)} tickers at {datetime.now(timezone.utc).isoformat()}"
     )

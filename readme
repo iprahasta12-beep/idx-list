@@ -7,9 +7,9 @@ snapshot every weekday hour.
 
 How it works
 ------------
-* Tickers covered by default: CMRY, MAIN, BBCA, BMRI, ARCI (queried via the
-  `.JK` Yahoo suffix).
-* Quote data replaces the existing `data/idx-data.csv` file so the dashboard
+* Tickers covered by default: 219 IDX listings sourced from the user-provided
+  universe (queried via the `.JK` Yahoo suffix).
+* Quote data replaces the snapshot stored at `data/idx-list.csv` so the dashboard
   always renders the most recent snapshot for the current trading date. Each
   row records the symbol, OHLC values, volume, and an ISO timestamp stored in
   the `last_updated_at` column.
@@ -20,7 +20,7 @@ Running the automation
 ----------------------
 
 ```bash
-python automation/fetch_idx_quotes.py --output data/idx-data.csv
+python automation/fetch_idx_quotes.py --output data/idx-list.csv
 ```
 
 Useful flags:
